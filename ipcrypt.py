@@ -7,7 +7,7 @@ Can be used to "anonymize" logs, etc.
 This uses a new 4-byte-block cipher, inspired from SipHash.
 
 Takes some file.csv, writes to stdout.
-IPs are assumed encoded as X.Y.Z.T
+IPs are assumed encoded as X.Y.Z.T (only IPv4, for IPv6 use AES)
 FIELD is the index of the IP in a CSV, starting from 0.
 KEY is a 16-byte secret key,
 
