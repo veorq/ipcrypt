@@ -82,7 +82,10 @@ def xor4(x, y):
 def encrypt(key, ip):
     """16-byte key, ip string like '192.168.1.2'"""
     k = [struct.unpack('<B', x)[0] for x in key]
-    state = [int(x) for x in ip.split('.')]
+    try:
+        state = [int(x) for x in ip.split('.')]
+    except ValueError:
+        raise
     state = xor4(state, k[:4])
     state = permute_fwd(state)
     state = xor4(state, k[4:8])
@@ -96,7 +99,10 @@ def encrypt(key, ip):
 def decrypt(key, ip):
     """16-byte key, encrypted ip string like '215.51.199.127'"""
     k = [struct.unpack('<B', x)[0] for x in key]
-    state = [int(x) for x in ip.split('.')]
+    try:
+        state = [int(x) for x in ip.split('.')]
+    except ValueError:
+        raise
     state = xor4(state, k[12:16])
     state = permute_bwd(state)
     state = xor4(state, k[8:12])
@@ -153,7 +159,10 @@ def main():
         for row in reader:
             ip = row[FIELD].strip()
             newrow = row
-            newrow[FIELD] = process(KEY, ip)
+            try:
+                newrow[FIELD] = process(KEY, ip)
+            except ValueError:
+                continue
             writer.writerow(newrow)
 
 
