@@ -1,28 +1,13 @@
 #!/usr/bin/env python
-"""
-IP-format-preserving encryption
-
-Can be used to "anonymize" logs, etc.
-
-This uses a new 4-byte-block cipher, inspired from SipHash.
-
-Takes some file.csv, writes to stdout.
-IPs are assumed encoded as X.Y.Z.T (only IPv4, for IPv6 use AES)
-FIELD is the index of the IP in a CSV, starting from 0.
-KEY is a 16-byte secret key,
-
-Copyright (c) 2015 Jean-Philippe Aumasson <jeanphilippe.aumasson@gmail.com>
-Under CC0 license <http://creativecommons.org/publicdomain/zero/1.0/>
-"""
 
 import csv
 import struct
 import sys
 
-
-FIELD = 0        # index of the IP in the CSV files
-KEY = '\xff'*16  # copy your key here
-DELIMITER = ','  # CSV delimiter character
+# copy your key here
+KEY = 'some 16-byte key'
+# CSV delimiter character
+DELIMITER = ','  
 
 
 def rotl(b, r):
@@ -86,13 +71,16 @@ def encrypt(key, ip):
         state = [int(x) for x in ip.split('.')]
     except ValueError:
         raise
-    state = xor4(state, k[:4])
-    state = permute_fwd(state)
-    state = xor4(state, k[4:8])
-    state = permute_fwd(state)
-    state = xor4(state, k[8:12])
-    state = permute_fwd(state)
-    state = xor4(state, k[12:16])
+    try:
+        state = xor4(state, k[:4])
+        state = permute_fwd(state)
+        state = xor4(state, k[4:8])
+        state = permute_fwd(state)
+        state = xor4(state, k[8:12])
+        state = permute_fwd(state)
+        state = xor4(state, k[12:16])
+    except IndexError:
+        raise
     return '.'.join(str(x) for x in state)
 
 
@@ -103,18 +91,22 @@ def decrypt(key, ip):
         state = [int(x) for x in ip.split('.')]
     except ValueError:
         raise
-    state = xor4(state, k[12:16])
-    state = permute_bwd(state)
-    state = xor4(state, k[8:12])
-    state = permute_bwd(state)
-    state = xor4(state, k[4:8])
-    state = permute_bwd(state)
-    state = xor4(state, k[:4])
+    try:
+        state = xor4(state, k[12:16])
+        state = permute_bwd(state)
+        state = xor4(state, k[8:12])
+        state = permute_bwd(state)
+        state = xor4(state, k[4:8])
+        state = permute_bwd(state)
+        state = xor4(state, k[:4])
+    except IndexError:
+        raise
     return '.'.join(str(x) for x in state)
 
 
 def usage():
-    print 'usage:  %s csvfile e|d' % sys.argv[0]
+    print 'usage:  %s csvfile index e|d'  % sys.argv[0]
+    print '\tindex = csv index in 0, 1, ...'
     print '\te = encrypt, d = decrypt'
     sys.exit(0)
 
@@ -122,11 +114,14 @@ def usage():
 def test():
     """basic encryption sanity check"""
     ip = init = '1.2.3.4'
-    iterations = 100
+    key = '\xff'*16 
+    iterations = 10
     for i in xrange(iterations):
-        ip = encrypt(KEY, ip)
+        ip = encrypt(key, ip)
+    if ip != '191.207.11.210':
+        raise ValueError
     for i in xrange(iterations):
-        ip = decrypt(KEY, ip)
+        ip = decrypt(key, ip)
     if ip != init:
         raise ValueError
 
@@ -141,8 +136,9 @@ def main():
 
     try:
         filein = sys.argv[1]
-        mode = sys.argv[2]
-    except IndexError:
+        index = int(sys.argv[2])
+        mode = sys.argv[3]
+    except:
         usage()
 
     if mode == 'e':
@@ -157,11 +153,11 @@ def main():
         writer = csv.writer(sys.stdout, delimiter=DELIMITER)
 
         for row in reader:
-            ip = row[FIELD].strip()
+            ip = row[index].strip()
             newrow = row
             try:
-                newrow[FIELD] = process(KEY, ip)
-            except ValueError:
+                newrow[index] = process(KEY, ip)
+            except:
                 continue
             writer.writerow(newrow)
 
