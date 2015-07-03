@@ -1,5 +1,5 @@
 
-# ipcrypt: IP-format-preserving encryption: 
+# ipcrypt: IP-format-preserving encryption
 
 Encrypts an IPv4 address to another IPv4 address 
 
@@ -39,4 +39,5 @@ c,171.238.15.199
 ```
 
 Copyright (c) 2015 Jean-Philippe Aumasson <jeanphilippe.aumasson@gmail.com>
+
 Under CC0 license <http://creativecommons.org/publicdomain/zero/1.0/>
