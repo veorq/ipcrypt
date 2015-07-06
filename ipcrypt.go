@@ -76,7 +76,6 @@ func permute_bwd(state [4]byte) [4]byte {
 
 func xor4(x [4]byte, y []byte) [4]byte {
 	return [4]byte{x[0] ^ y[0], x[1] ^ y[1], x[2] ^ y[2], x[3] ^ y[3]}
-
 }
 
 func bytes2ip(bytes [4]byte) string {
