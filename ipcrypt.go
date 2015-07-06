@@ -1,9 +1,13 @@
 package main
 
+// see also https://github.com/dgryski/go-ipcrypt/
+
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -75,13 +79,21 @@ func xor4(x [4]byte, y []byte) [4]byte {
 
 }
 
-func encrypt(k [16]byte, ip string) string {
-	ipaddr := strings.Split(ip, ".")
-	a, _ := strconv.Atoi(ipaddr[0])
-	b, _ := strconv.Atoi(ipaddr[1])
-	c, _ := strconv.Atoi(ipaddr[2])
-	d, _ := strconv.Atoi(ipaddr[3])
-	state := [4]byte{byte(a), byte(b), byte(c), byte(d)}
+func bytes2ip(bytes [4]byte) string {
+	ipaddr := []string{"", "", "", ""}
+	ipaddr[0] = strconv.Itoa(int(bytes[0]))
+	ipaddr[1] = strconv.Itoa(int(bytes[1]))
+	ipaddr[2] = strconv.Itoa(int(bytes[2]))
+	ipaddr[3] = strconv.Itoa(int(bytes[3]))
+	return strings.Join(ipaddr, ".")
+}
+
+func Encrypt(k [16]byte, ip string) (string, error) {
+	p := net.ParseIP(ip)
+	if p == nil {
+		return "", errors.New("encrypt: invalid IP")
+	}
+	state := [4]byte{p[12], p[13], p[14], p[15]}
 
 	state = xor4(state, k[:4])
 	state = permute_fwd(state)
@@ -91,20 +103,15 @@ func encrypt(k [16]byte, ip string) string {
 	state = permute_fwd(state)
 	state = xor4(state, k[12:16])
 
-	ipaddr[0] = strconv.Itoa(int(state[0]))
-	ipaddr[1] = strconv.Itoa(int(state[1]))
-	ipaddr[2] = strconv.Itoa(int(state[2]))
-	ipaddr[3] = strconv.Itoa(int(state[3]))
-	return strings.Join(ipaddr, ".")
+	return bytes2ip(state), nil
 }
 
-func decrypt(k [16]byte, ip string) string {
-	ipaddr := strings.Split(ip, ".")
-	a, _ := strconv.Atoi(ipaddr[0])
-	b, _ := strconv.Atoi(ipaddr[1])
-	c, _ := strconv.Atoi(ipaddr[2])
-	d, _ := strconv.Atoi(ipaddr[3])
-	state := [4]byte{byte(a), byte(b), byte(c), byte(d)}
+func Decrypt(k [16]byte, ip string) (string, error) {
+	p := net.ParseIP(ip)
+	if p == nil {
+		return "", errors.New("encrypt: invalid IP")
+	}
+	state := [4]byte{p[12], p[13], p[14], p[15]}
 
 	state = xor4(state, k[12:16])
 	state = permute_bwd(state)
@@ -114,50 +121,61 @@ func decrypt(k [16]byte, ip string) string {
 	state = permute_bwd(state)
 	state = xor4(state, k[:4])
 
-	ipaddr[0] = strconv.Itoa(int(state[0]))
-	ipaddr[1] = strconv.Itoa(int(state[1]))
-	ipaddr[2] = strconv.Itoa(int(state[2]))
-	ipaddr[3] = strconv.Itoa(int(state[3]))
-	return strings.Join(ipaddr, ".")
+	return bytes2ip(state), nil
 }
 
-func test() int {
+func test() error {
 	ip := "1.2.3.4"
 	init := ip
+	var err error
 	var key [16]byte
 	for i := 0; i < 16; i++ {
 		key[i] = 0xff
 	}
 	for i := 0; i < 10; i++ {
-		ip = encrypt(key, ip)
+		ip, err = Encrypt(key, ip)
+		if err != nil {
+			return err
+		}
 	}
 	if ip != "191.207.11.210" {
-		fmt.Println("test failed: wrong intermediate value")
-		return 1
+		return errors.New("test failed: wrong intermediate value")
 	}
 	for i := 0; i < 10; i++ {
-		ip = decrypt(key, ip)
+		ip, err = Decrypt(key, ip)
+		if err != nil {
+			return err
+		}
 	}
 	if init != ip {
-		fmt.Println("test failed: decrypted values doesn't match")
-		return 2
+		return errors.New("test failed: decrypted values doesn't match")
 	}
-	return 0
+	return nil
 }
 
 func main() {
-	if test() != 0 {
+	err := test()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	if len(os.Args) < 4 {
+		fmt.Println("not enough arguments")
 		return
 	}
 	filein := os.Args[1]
-	index, _ := strconv.Atoi(os.Args[2])
+	index, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	mode := os.Args[3]
 
-	var process func([16]byte, string) string
+	var process func([16]byte, string) (string, error)
 	if mode == "e" {
-		process = encrypt
+		process = Encrypt
 	} else if mode == "d" {
-		process = decrypt
+		process = Decrypt
 	} else {
 		fmt.Println("error: wrong mode")
 		return
@@ -165,7 +183,7 @@ func main() {
 
 	file, err := os.Open(filein)
 	if err != nil {
-		fmt.Println("open failed:", err)
+		fmt.Println(err)
 		return
 	}
 
@@ -186,12 +204,18 @@ func main() {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Println("reader error:", err)
+			fmt.Println(err)
 			return
 		}
 		newline := line
-		newline[index] = process(key, line[index])
-		writer.Write(newline)
+		newline[index], err = process(key, line[index])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if err == nil {
+			writer.Write(newline)
+		}
 	}
 
 	writer.Flush()
