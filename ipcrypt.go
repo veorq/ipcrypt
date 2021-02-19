@@ -1,14 +1,10 @@
-package main
+package ipcrypt
 
 // see also https://github.com/dgryski/go-ipcrypt/
 
 import (
-	"encoding/csv"
 	"errors"
-	"fmt"
-	"io"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -123,35 +119,7 @@ func Decrypt(k [16]byte, ip string) (string, error) {
 	return bytes2ip(state), nil
 }
 
-func test() error {
-	ip := "1.2.3.4"
-	init := ip
-	var err error
-	var key [16]byte
-	for i := 0; i < 16; i++ {
-		key[i] = 0xff
-	}
-	for i := 0; i < 10; i++ {
-		ip, err = Encrypt(key, ip)
-		if err != nil {
-			return err
-		}
-	}
-	if ip != "191.207.11.210" {
-		return errors.New("test failed: wrong intermediate value")
-	}
-	for i := 0; i < 10; i++ {
-		ip, err = Decrypt(key, ip)
-		if err != nil {
-			return err
-		}
-	}
-	if init != ip {
-		return errors.New("test failed: decrypted values doesn't match")
-	}
-	return nil
-}
-
+/*
 func main() {
 	err := test()
 	if err != nil {
@@ -219,3 +187,4 @@ func main() {
 
 	writer.Flush()
 }
+*/
